@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple POS Invoice System</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    h2 { text-align: center; }
+    .container {
+      max-width: 800px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 10px; text-align: center; }
+    .btn {
+      padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;
+    }
+    .btn:hover { background: #0056b3; }
+
+    #invoiceArea { margin-top: 20px; padding: 0; display: none; background: #fff; border: none; }
+    @media print {
+      body * { visibility: hidden; }
+      #invoiceArea, #invoiceArea * { visibility: visible; }
+      #invoiceArea { position: absolute; top: 0; left: 0; width: 100%; }
+    }
+    .receipt {
+      width: 280px; margin: 0 auto; padding: 10px; background: #fff; font-size: 13px; line-height: 1.3;
+      font-family: 'Courier New', monospace; border: 1px dashed #999;
+    }
+    .note { font-size:13px; color:#444; }
+    label { display:inline-block; width:80px; }
+    input { margin:5px 10px 5px 0; padding:6px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Simple POS Invoice System</h2>
+
+    <div>
+      <label>Item Name:</label>
+      <input type="text" id="itemName" />
+
+      <label>Price:</label>
+      <input type="number" id="itemPrice" step="0.01" />
+
+      <label>Quantity:</label>
+      <input type="number" id="itemQty" />
+
+      <button class="btn" id="addBtn">Add Item</button>
+      <button class="btn" id="cancelEditBtn" style="display:none; margin-left:8px; background:#6c757d;">Cancel Edit</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Price</th>
+          <th>Qty</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="itemList"></tbody>
+    </table>
+    <p class="note">* Click an item row to edit it *</p>
+
+    <h3>Total Amount: PKR <span id="grandTotal">0.00</span></h3>
+
+    <button class="btn" id="genBtn">Generate Invoice</button>
+
+    <div id="invoiceArea">
+      <div class="receipt">
+        <h3 style="text-align:center; font-size:16px; letter-spacing:1px;">CASH RECEIPT</h3>
+        <p id="storeInfo">Shop Name: My Store<br>Address: City, Country</p>
+        <hr>
+        <div id="invoiceContent"></div>
+        <p id="invDateTime" style="margin-top:10px;"></p>
+        <hr>
+        <p style="text-align:center;">THANK YOU FOR SHOPPING!</p>
+        <br>
+        <button class="btn" onclick="window.print()">Print Invoice</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // state
+    let items = [];
+    let editIndex = -1;
+
+    // elements
+    const itemNameEl = document.getElementById('itemName');
+    const itemPriceEl = document.getElementById('itemPrice');
+    const itemQtyEl = document.getElementById('itemQty');
+    const itemListEl = document.getElementById('itemList');
+    const grandTotalEl = document.getElementById('grandTotal');
+    const invoiceAreaEl = document.getElementById('invoiceArea');
+    const invoiceContentEl = document.getElementById('invoiceContent');
+    const invDateTimeEl = document.getElementById('invDateTime');
+    const addBtn = document.getElementById('addBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    const genBtn = document.getElementById('genBtn');
+
+    function escapeHtml(text) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+      return String(text).replace(/[&<>\"']/g, function(m){ return map[m]; });
+    }
+
+    function renderTable() {
+      let html = '';
+      let grand = 0;
+      items.forEach((it, index) => {
+        grand += it.total;
+        html += `<tr onclick="editItem(${index})"><td>${escapeHtml(it.name)}</td><td>${it.price.toFixed(2)}</td><td>${it.qty}</td><td>${it.total.toFixed(2)}</td></tr>`;
+      });
+      itemListEl.innerHTML = html;
+      grandTotalEl.textContent = grand.toFixed(2);
+    }
+
+    function clearInputs() {
+      itemNameEl.value = '';
+      itemPriceEl.value = '';
+      itemQtyEl.value = '';
+      editIndex = -1;
+      addBtn.textContent = 'Add Item';
+      cancelEditBtn.style.display = 'none';
+    }
+
+    function addItem() {
+      const name = itemNameEl.value.trim();
+      const price = parseFloat(itemPriceEl.value);
+      const qty = parseInt(itemQtyEl.value, 10);
+
+      if (!name || isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) {
+        alert('Please enter valid item name, price and quantity.');
+        return;
+      }
+
+      const total = +(price * qty);
+
+      if (editIndex === -1) {
+        items.push({ name, price, qty, total });
+      } else {
+        items[editIndex] = { name, price, qty, total };
+      }
+
+      renderTable();
+      clearInputs();
+    }
+
+    function editItem(i) {
+      const it = items[i];
+      itemNameEl.value = it.name;
+      itemPriceEl.value = it.price;
+      itemQtyEl.value = it.qty;
+      editIndex = i;
+      addBtn.textContent = 'Save Item';
+      cancelEditBtn.style.display = 'inline-block';
+    }
+
+    function cancelEdit() {
+      clearInputs();
+    }
+
+    function generateInvoice() {
+      if (items.length === 0) { alert('No items added.'); return; }
+      let invoiceHTML = '';
+      let grand = 0;
+      items.forEach(it => {
+        invoiceHTML += `${escapeHtml(it.name)} - ${it.qty} x PKR ${it.price.toFixed(2)} = PKR ${it.total.toFixed(2)}<br>`;
+        grand += it.total;
+      });
+
+      invoiceContentEl.innerHTML = invoiceHTML + `<br><strong>Grand Total: PKR ${grand.toFixed(2)}</strong>`;
+      const now = new Date();
+      invDateTimeEl.innerHTML = `Date: ${now.toLocaleDateString()}<br>Time: ${now.toLocaleTimeString()}`;
+      invoiceAreaEl.style.display = 'block';
+    }
+
+    // wire buttons
+    addBtn.addEventListener('click', addItem);
+    cancelEditBtn.addEventListener('click', cancelEdit);
+    genBtn.addEventListener('click', generateInvoice);
+
+    // initial render
+    renderTable();
+  </script>
+</body>
+</html>
